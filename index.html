@@ -174,6 +174,25 @@
   .tab-menu-item.danger { color: #d93025; }
   body { padding-bottom: 42px; }
 
+  /* Welcome / about overlay */
+  .welcome-overlay { display: none; position: fixed; inset: 0; background: rgba(15,15,20,0.5); backdrop-filter: blur(4px); z-index: 200; justify-content: center; align-items: center; animation: fadeIn 0.2s ease; }
+  .welcome-overlay.active { display: flex; }
+  .welcome-modal { background: #fff; border-radius: 20px; width: 600px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.2); animation: slideUp 0.25s ease; position: relative; }
+  .welcome-close { position: absolute; top: 16px; right: 20px; background: #f1f3f4; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; color: #5f6368; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; }
+  .welcome-close:hover { background: #e8eaed; color: #1a1a1a; }
+  .welcome-inner { padding: 48px 44px 40px; }
+  .welcome-inner h2 { font-size: 1.6rem; font-weight: 700; color: #1a1a1a; letter-spacing: -0.02em; margin-bottom: 10px; }
+  .welcome-inner .tagline { font-size: 0.95rem; color: #5f6368; margin-bottom: 28px; line-height: 1.6; }
+  .welcome-points { display: flex; flex-direction: column; gap: 18px; margin-bottom: 32px; }
+  .welcome-point { display: flex; gap: 14px; align-items: flex-start; }
+  .welcome-point .wp-num { width: 28px; height: 28px; background: #e8f0fe; color: #1a73e8; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .welcome-point .wp-text { font-size: 0.9rem; color: #3c4043; line-height: 1.55; }
+  .welcome-point .wp-text strong { color: #1a1a1a; }
+  .welcome-footer { text-align: center; }
+  .welcome-cta { padding: 12px 36px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  .welcome-cta:hover { background: #1557b0; }
+  .welcome-sub { font-size: 0.78rem; color: #9aa0a6; margin-top: 14px; line-height: 1.5; max-width: 480px; margin-left: auto; margin-right: auto; }
+
   /* Help panel */
   .help-btn { padding: 7px 14px; border: 1px solid #dadce0; background: #fff; color: #3c4043; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 500; }
   .help-btn:hover { background: #f1f3f4; }
@@ -193,9 +212,42 @@
 </head>
 <body>
 
+<div class="welcome-overlay" id="welcome-overlay" onclick="if(event.target===this)closeWelcome()">
+  <div class="welcome-modal">
+    <button class="welcome-close" onclick="closeWelcome()">&times;</button>
+    <div class="welcome-inner">
+      <h2>Design your ideal week.</h2>
+      <p class="tagline">Most people fill their calendar reactively — then wonder why there's no time for the things that actually matter. This tool flips that. You design the week you want to live, then protect it.</p>
+      <div class="welcome-points">
+        <div class="welcome-point">
+          <span class="wp-num">1</span>
+          <div class="wp-text"><strong>Map everything.</strong> Not just work. Meals, exercise, reading, rest, relationships, creative time — all of it. This should show you how you'd ideally prioritise your time across your whole life.</div>
+        </div>
+        <div class="welcome-point">
+          <span class="wp-num">2</span>
+          <div class="wp-text"><strong>Block your real work.</strong> For founders, that's deep work only you can do. For coaches, block the sessions you'd want if fully booked — that's your inventory. Any slot without a client is time to be out meeting new people to work with.</div>
+        </div>
+        <div class="welcome-point">
+          <span class="wp-num">3</span>
+          <div class="wp-text"><strong>Be ruthless with the rest.</strong> Every meeting should earn its slot. Every unblocked hour is a choice. Don't let your calendar fill itself.</div>
+        </div>
+        <div class="welcome-point">
+          <span class="wp-num">4</span>
+          <div class="wp-text"><strong>No overlapping blocks.</strong> Every hour has one purpose. If it doesn't all fit, something has to go — that tension is the whole point.</div>
+        </div>
+      </div>
+      <div class="welcome-footer">
+        <button class="welcome-cta" onclick="closeWelcome()">Start building</button>
+        <p class="welcome-sub">This is a desktop exercise. Set aside 20 minutes to an hour depending on how deep you want to go. Be honest about what your ideal week actually looks like — not the aspirational version, the one you'd actually stick to.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="header">
   <div><h1>Ideal Week Planner</h1><div class="byline">by <a href="https://timnoakesmith.com" target="_blank">Tim Noakesmith</a></div></div>
   <div class="header-actions">
+    <button class="help-btn" onclick="openWelcome()">What is this?</button>
     <button class="help-btn" id="help-toggle-btn" onclick="toggleHelp()">How to use</button>
     <button onclick="exportPDF()">Export PDF</button>
     <button onclick="exportJSON()">Save backup</button>
@@ -1532,6 +1584,14 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.day-ctx')) closeDayCtx();
 });
 
+function openWelcome() {
+  document.getElementById('welcome-overlay').classList.add('active');
+}
+
+function closeWelcome() {
+  document.getElementById('welcome-overlay').classList.remove('active');
+}
+
 function toggleHelp() {
   const panel = document.getElementById('help-panel');
   panel.classList.toggle('open');
@@ -1539,7 +1599,7 @@ function toggleHelp() {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeModal(); closeBreakdown(); }
+  if (e.key === 'Escape') { closeModal(); closeBreakdown(); closeWelcome(); }
   if (e.key === 'Enter' && document.getElementById('modal').classList.contains('active') && document.activeElement !== catInput) saveBlock();
   if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
     e.preventDefault();
@@ -1563,10 +1623,10 @@ function dismissNudge() {
 
 checkNudge();
 
-// First visit: auto-open help
+// First visit: show welcome overlay
 if (!localStorage.getItem('idealWeekVisited')) {
   localStorage.setItem('idealWeekVisited', '1');
-  toggleHelp();
+  openWelcome();
 }
 </script>
 </body>
