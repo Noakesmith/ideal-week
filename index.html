@@ -10,9 +10,18 @@
 
   .header { padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #e0e0e0; }
   .header h1 { font-size: 1.3rem; font-weight: 600; color: #1a73e8; }
+  .header .byline { font-size: 0.72rem; color: #9aa0a6; margin-top: 1px; }
+  .header .byline a { color: #9aa0a6; text-decoration: none; }
+  .header .byline a:hover { color: #1a73e8; text-decoration: underline; }
   .header-actions { display: flex; gap: 8px; }
   .header-actions button { padding: 7px 14px; border: 1px solid #dadce0; background: #fff; color: #3c4043; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 500; }
   .header-actions button:hover { background: #f1f3f4; }
+  .btn-clear-all { color: #d93025 !important; border-color: #fad2cf !important; }
+  .btn-clear-all:hover { background: #fce8e6 !important; }
+  .nudge-banner { padding: 10px 24px; background: #fef7e0; border-bottom: 1px solid #f5e6b8; display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: #8a6d00; }
+  .nudge-banner button { padding: 4px 12px; background: #fff; border: 1px solid #f5e6b8; border-radius: 6px; cursor: pointer; font-size: 0.78rem; color: #8a6d00; font-weight: 500; }
+  .nudge-banner button:hover { background: #fef7e0; }
+  .nudge-banner .dismiss { background: none; border: none; color: #bfa530; cursor: pointer; font-size: 1rem; padding: 0 4px; margin-left: auto; }
 
   .summary { padding: 10px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.8rem; align-items: center; }
   .summary-item { color: #5f6368; }
@@ -104,6 +113,8 @@
   .block-action { cursor: pointer; font-size: 0.75rem; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.1); }
   .block-action:hover { background: rgba(0,0,0,0.2); }
   .block.dragging { opacity: 0.5; z-index: 1; }
+  .block.overlap { outline: 2px dashed #d93025; outline-offset: -2px; }
+  .block.overlap::before { content: '!'; position: absolute; top: 3px; right: 24px; width: 16px; height: 16px; background: #d93025; color: #fff; border-radius: 50%; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; z-index: 5; }
 
   .block .resize-handle { position: absolute; bottom: 0; left: 0; right: 0; height: 8px; cursor: ns-resize; }
   .block .resize-handle-left, .block .resize-handle-right { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; z-index: 4; }
@@ -183,12 +194,13 @@
 <body>
 
 <div class="header">
-  <h1>Ideal Week Planner</h1>
+  <div><h1>Ideal Week Planner</h1><div class="byline">by <a href="https://timnoakesmith.com" target="_blank">Tim Noakesmith</a></div></div>
   <div class="header-actions">
     <button class="help-btn" id="help-toggle-btn" onclick="toggleHelp()">How to use</button>
-    <button onclick="clearAll()">Clear All</button>
-    <button onclick="exportJSON()">Export</button>
+    <button onclick="exportPDF()">Export PDF</button>
+    <button onclick="exportJSON()">Save backup</button>
     <button onclick="importJSON()">Import</button>
+    <button class="btn-clear-all" onclick="clearAll()">Clear All</button>
   </div>
 </div>
 
@@ -238,6 +250,12 @@
   <div class="help-note">
     <strong>The goal:</strong> Design your ideal week with no overlapping blocks — every hour has one purpose. This is a desktop exercise, not optimised for mobile. Sit down, take your time, and be intentional about it.
   </div>
+</div>
+
+<div class="nudge-banner" id="nudge-banner" style="display:none">
+  <span>Your plan saves in this browser only. Export a backup so you don't lose your work.</span>
+  <button onclick="exportJSON(); dismissNudge();">Save backup now</button>
+  <span class="dismiss" onclick="dismissNudge()">&times;</span>
 </div>
 
 <div class="summary" id="summary"></div>
@@ -769,8 +787,23 @@ function clearDay() {
 }
 
 
+function getOverlaps() {
+  const overlapping = new Set();
+  for (let i = 0; i < blocks.length; i++) {
+    for (let j = i + 1; j < blocks.length; j++) {
+      const a = blocks[i], b = blocks[j];
+      if (a.day === b.day && a.start < b.end && b.start < a.end) {
+        overlapping.add(i);
+        overlapping.add(j);
+      }
+    }
+  }
+  return overlapping;
+}
+
 function renderBlocks() {
   document.querySelectorAll('.block').forEach(el => el.remove());
+  const overlaps = getOverlaps();
 
   blocks.forEach((block, idx) => {
     const cols = document.querySelectorAll('.day-column');
@@ -783,7 +816,7 @@ function renderBlocks() {
     const height = (block.end - block.start) * SLOT_HEIGHT;
 
     const el = document.createElement('div');
-    el.className = 'block';
+    el.className = 'block' + (overlaps.has(idx) ? ' overlap' : '');
     el.dataset.blockIdx = idx;
     el.style.top = top + 'px';
     el.style.height = height + 'px';
@@ -1091,6 +1124,7 @@ function saveBlock() {
   closeModal();
   renderBlocks();
   renderSummary();
+  checkNudge();
 }
 
 function deleteBlock() {
@@ -1188,6 +1222,140 @@ function clearAll() {
     renderBlocks();
     renderSummary();
   }
+}
+
+function exportPDF() {
+  const tabName = tabs[activeTabIdx].name;
+  const totals = {};
+  blocks.forEach(b => {
+    const name = b.category || 'Uncategorized';
+    totals[name] = (totals[name] || 0) + (b.end - b.start);
+  });
+  const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const totalHrs = Object.values(totals).reduce((a, b) => a + b, 0);
+
+  // Build calendar grid HTML
+  let calHtml = '<table class="cal-table"><thead><tr><th class="time-col"></th>';
+  DAYS.forEach(d => { calHtml += `<th>${d}</th>`; });
+  calHtml += '</tr></thead><tbody>';
+  for (let h = START_HOUR; h < END_HOUR; h++) {
+    calHtml += `<tr><td class="time-col">${timeStr(h)}</td>`;
+    DAYS.forEach((_, di) => {
+      const dayBlocks = blocks.filter(b => b.day === di && b.start < h + 1 && b.end > h);
+      if (dayBlocks.length > 0) {
+        const b = dayBlocks[0];
+        if (b.start >= h && b.start < h + 1) {
+          const span = Math.min(Math.ceil(b.end - b.start), END_HOUR - h);
+          const cat = getCategoryStyle(b.category);
+          calHtml += `<td rowspan="${span}" style="background:${cat.bg};border-left:3px solid ${cat.color};color:${cat.text};padding:4px 6px;font-size:11px;vertical-align:top;"><strong>${b.title}</strong><br><span style="font-size:10px;opacity:0.7">${timeStr(b.start)}-${timeStr(b.end)}</span></td>`;
+        } else if (!blocks.some(b2 => b2.day === di && b2.start < h && b2.start >= h - Math.ceil(b2.end - b2.start) + 1 && b2 === b)) {
+          // skip — covered by rowspan
+        }
+      } else {
+        // Check if covered by a rowspan from above
+        const covered = blocks.some(b => b.day === di && b.start < h && b.end > h);
+        if (!covered) calHtml += '<td></td>';
+      }
+    });
+    calHtml += '</tr>';
+  }
+  calHtml += '</tbody></table>';
+
+  // Build pie chart CSS
+  let gradStops = [], cumPct = 0;
+  const gap = sorted.length > 1 ? 0.5 : 0;
+  for (const [name, hrs] of sorted) {
+    const style = getCategoryStyle(name);
+    const pct = (hrs / totalHrs) * 100 - gap;
+    gradStops.push(`transparent ${cumPct}% ${cumPct + gap / 2}%`);
+    gradStops.push(`${style.color} ${cumPct + gap / 2}% ${cumPct + gap / 2 + pct}%`);
+    cumPct += pct + gap;
+  }
+
+  // Build breakdown rows
+  let breakdownHtml = '';
+  for (const [name, hrs] of sorted) {
+    const style = getCategoryStyle(name);
+    const pct = totalHrs > 0 ? Math.round((hrs / totalHrs) * 100) : 0;
+    const perDay = (hrs / 7).toFixed(1);
+    breakdownHtml += `<div class="bd-row"><span class="bd-dot" style="background:${style.color}"></span><span class="bd-name">${name}</span><span class="bd-hrs">${hrs}h (${perDay}h/day)</span><span class="bd-pct">${pct}%</span></div>`;
+  }
+
+  // Build text summary
+  let textHtml = '';
+  DAYS.forEach((day, di) => {
+    const dayBlocks = blocks.filter(b => b.day === di).sort((a, b) => a.start - b.start);
+    if (dayBlocks.length === 0) {
+      textHtml += `<div class="day-summary"><h3>${day}</h3><p class="empty">No blocks scheduled</p></div>`;
+      return;
+    }
+    textHtml += `<div class="day-summary"><h3>${day}</h3>`;
+    dayBlocks.forEach(b => {
+      const cat = b.category ? ` <span class="cat">${b.category}</span>` : '';
+      textHtml += `<div class="ts-block">${timeStr(b.start)} - ${timeStr(b.end)} &mdash; <strong>${b.title}</strong>${cat}</div>`;
+    });
+    textHtml += '</div>';
+  });
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>${tabName} - Ideal Week</title><style>
+    @page { margin: 20mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; }
+    h1 { font-size: 22px; color: #1a73e8; margin-bottom: 4px; }
+    .subtitle { color: #9aa0a6; font-size: 12px; margin-bottom: 20px; }
+    .page-break { page-break-before: always; padding-top: 10px; }
+
+    /* Calendar */
+    .cal-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .cal-table th { background: #f8f9fa; padding: 8px 4px; text-align: center; font-weight: 600; font-size: 12px; border-bottom: 2px solid #e0e0e0; }
+    .cal-table td { border: 1px solid #f1f3f4; padding: 2px; height: 28px; min-width: 80px; }
+    .cal-table .time-col { width: 60px; font-size: 10px; color: #70757a; text-align: right; padding-right: 8px; border: none; white-space: nowrap; }
+
+    /* Breakdown */
+    .breakdown-wrap { display: flex; gap: 40px; align-items: flex-start; margin-top: 20px; }
+    .pie { width: 180px; height: 180px; border-radius: 50%; position: relative; flex-shrink: 0; }
+    .pie-hole { position: absolute; inset: 40px; border-radius: 50%; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .pie-hole .total { font-size: 28px; font-weight: 800; }
+    .pie-hole .lbl { font-size: 10px; color: #9aa0a6; text-transform: uppercase; letter-spacing: 0.05em; }
+    .bd-list { flex: 1; }
+    .bd-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f3f4; }
+    .bd-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+    .bd-name { flex: 1; font-weight: 600; font-size: 13px; }
+    .bd-hrs { font-size: 12px; color: #5f6368; min-width: 100px; }
+    .bd-pct { font-size: 16px; font-weight: 700; min-width: 44px; text-align: right; }
+
+    /* Text summary */
+    .day-summary { margin-bottom: 16px; }
+    .day-summary h3 { font-size: 14px; color: #1a73e8; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #e0e0e0; }
+    .ts-block { font-size: 12px; padding: 3px 0; }
+    .ts-block .cat { color: #9aa0a6; font-size: 11px; }
+    .empty { color: #9aa0a6; font-size: 12px; font-style: italic; }
+  </style></head><body>
+
+  <h1>${tabName}</h1>
+  <div class="subtitle">Ideal Week Planner &middot; ${totalHrs} hours blocked &middot; ${blocks.length} blocks</div>
+  ${calHtml}
+
+  <div class="page-break">
+    <h1>Time Breakdown</h1>
+    <div class="subtitle">${sorted.length} categories &middot; ${(totalHrs / 7).toFixed(1)}h average per day</div>
+    <div class="breakdown-wrap">
+      <div class="pie" style="background:conic-gradient(${gradStops.join(', ')})">
+        <div class="pie-hole"><span class="total">${totalHrs}</span><span class="lbl">hrs / week</span></div>
+      </div>
+      <div class="bd-list">${breakdownHtml}</div>
+    </div>
+  </div>
+
+  <div class="page-break">
+    <h1>Schedule Summary</h1>
+    <div class="subtitle">Block-by-block view of your ideal week</div>
+    ${textHtml}
+  </div>
+
+  </body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 300);
 }
 
 function exportJSON() {
@@ -1381,6 +1549,25 @@ document.addEventListener('keydown', (e) => {
 
 buildCalendar();
 renderTabs();
+
+function checkNudge() {
+  if (localStorage.getItem('idealWeekNudgeDismissed')) return;
+  if (blocks.length >= 3) {
+    document.getElementById('nudge-banner').style.display = 'flex';
+  }
+}
+function dismissNudge() {
+  localStorage.setItem('idealWeekNudgeDismissed', '1');
+  document.getElementById('nudge-banner').style.display = 'none';
+}
+
+checkNudge();
+
+// First visit: auto-open help
+if (!localStorage.getItem('idealWeekVisited')) {
+  localStorage.setItem('idealWeekVisited', '1');
+  toggleHelp();
+}
 </script>
 </body>
 </html>
