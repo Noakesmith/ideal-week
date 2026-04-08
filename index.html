@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ideal Week Planner</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a1a; user-select: none; }
+
+  .header { padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #e0e0e0; }
+  .header h1 { font-size: 1.3rem; font-weight: 600; color: #1a73e8; }
+  .header-actions { display: flex; gap: 8px; }
+  .header-actions button { padding: 7px 14px; border: 1px solid #dadce0; background: #fff; color: #3c4043; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 500; }
+  .header-actions button:hover { background: #f1f3f4; }
+
+  .summary { padding: 10px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.8rem; align-items: center; }
+  .summary-item { color: #5f6368; }
+  .summary-item span { color: #1a1a1a; font-weight: 600; }
+  .summary-btn { padding: 5px 12px; border: 1px solid #dadce0; background: #fff; color: #1a73e8; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 500; }
+  .summary-btn:hover { background: #f1f3f4; }
+
+  /* Breakdown modal */
+  /* Breakdown modal */
+  .breakdown-overlay { display: none; position: fixed; inset: 0; background: rgba(15,15,20,0.5); backdrop-filter: blur(4px); z-index: 100; justify-content: center; align-items: center; animation: fadeIn 0.2s ease; }
+  .breakdown-overlay.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .breakdown-modal { background: #fff; border-radius: 20px; width: 580px; max-width: 92vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.2); position: relative; animation: slideUp 0.25s ease; }
+
+  .breakdown-header { padding: 28px 36px 0; display: flex; justify-content: space-between; align-items: flex-start; }
+  .breakdown-header h2 { font-size: 1.2rem; font-weight: 700; color: #1a1a1a; letter-spacing: -0.01em; }
+  .breakdown-header p { font-size: 0.78rem; color: #9aa0a6; margin-top: 2px; }
+  .breakdown-close { background: #f1f3f4; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; color: #5f6368; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+  .breakdown-close:hover { background: #e8eaed; color: #1a1a1a; }
+
+  .breakdown-body { padding: 28px 36px 32px; display: flex; gap: 36px; align-items: flex-start; }
+
+  .breakdown-chart-wrap { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
+  .breakdown-chart { width: 200px; height: 200px; border-radius: 50%; position: relative; transition: background 0.3s; }
+  .breakdown-chart-hole { position: absolute; inset: 44px; border-radius: 50%; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 0 4px rgba(255,255,255,1); }
+  .breakdown-chart-hole .total { font-size: 2rem; font-weight: 800; color: #1a1a1a; line-height: 1; letter-spacing: -0.02em; }
+  .breakdown-chart-hole .label { font-size: 0.7rem; color: #9aa0a6; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+  .breakdown-chart-sub { margin-top: 14px; font-size: 0.75rem; color: #9aa0a6; text-align: center; }
+
+  .breakdown-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .breakdown-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; transition: background 0.12s; }
+  .breakdown-row:hover { background: #f8f9fa; }
+  .breakdown-row .dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+  .breakdown-row .info { flex: 1; min-width: 0; }
+  .breakdown-row .name { font-size: 0.88rem; font-weight: 600; color: #1a1a1a; }
+  .breakdown-row .detail { font-size: 0.75rem; color: #9aa0a6; margin-top: 1px; }
+  .breakdown-row .bar-wrap { width: 100%; height: 4px; background: #f1f3f4; border-radius: 2px; margin-top: 5px; overflow: hidden; }
+  .breakdown-row .bar { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
+  .breakdown-row .pct-big { font-size: 1.05rem; font-weight: 700; color: #3c4043; min-width: 44px; text-align: right; flex-shrink: 0; }
+
+  .calendar-container { display: flex; overflow-x: auto; background: #fff; }
+
+  .time-column { min-width: 60px; border-right: 1px solid #e0e0e0; position: sticky; left: 0; z-index: 10; background: #fff; }
+  .time-column .day-header { height: 40px; border-bottom: 1px solid #e0e0e0; }
+  .time-label { height: 48px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 0 8px; font-size: 0.7rem; color: #70757a; transform: translateY(-7px); }
+  .time-label:first-of-type { transform: none; padding-top: 2px; }
+
+  .day-column { flex: 1; min-width: 140px; border-right: 1px solid #efefef; position: relative; }
+  .day-header { height: 40px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.82rem; color: #3c4043; border-bottom: 1px solid #e0e0e0; background: #fff; cursor: pointer; position: relative; }
+  .day-header .drag-hint { position: absolute; top: 0; bottom: 0; width: 12px; cursor: ew-resize; }
+  .day-header .drag-hint-left { left: 0; }
+  .day-header .drag-hint-right { right: 0; }
+  .day-header .drag-hint::after { content: ''; position: absolute; top: 50%; transform: translateY(-50%); width: 4px; height: 16px; border-left: 2px dotted transparent; border-right: 2px dotted transparent; }
+  .day-header .drag-hint-left::after { left: 3px; }
+  .day-header .drag-hint-right::after { right: 3px; }
+  .day-header:hover .drag-hint::after { border-left-color: #bbb; border-right-color: #bbb; }
+  .day-header:hover { background: #f8f9fa; }
+  .day-header.weekend { color: #9aa0a6; }
+
+  /* Day context menu */
+  .day-ctx { position: fixed; background: #fff; border: 1px solid #dadce0; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); display: none; z-index: 60; min-width: 180px; overflow: visible; padding: 4px 0; }
+  .day-ctx.open { display: block; }
+  .day-ctx-item { padding: 8px 14px; font-size: 0.82rem; cursor: pointer; color: #3c4043; position: relative; display: flex; align-items: center; justify-content: space-between; }
+  .day-ctx-item:hover { background: #f1f3f4; }
+  .day-ctx-item.danger { color: #d93025; }
+  .day-ctx-item .arrow { font-size: 0.7rem; color: #9aa0a6; }
+  .day-ctx-sub { position: absolute; left: 100%; top: -4px; background: #fff; border: 1px solid #dadce0; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); min-width: 150px; padding: 4px 0; display: none; }
+  .day-ctx-item:hover > .day-ctx-sub { display: block; }
+  .day-ctx-sub .day-ctx-item { padding: 7px 14px; }
+
+  .day-slots { position: relative; }
+  .slot { height: 48px; border-bottom: 1px solid #f1f3f4; cursor: crosshair; position: relative; }
+  .slot:nth-child(odd) { border-bottom-style: dashed; border-bottom-color: #f1f3f4; }
+
+  .drag-preview { position: absolute; left: 3px; right: 3px; background: rgba(26,115,232,0.12); border: 2px dashed rgba(26,115,232,0.4); border-radius: 6px; z-index: 1; pointer-events: none; }
+
+  .block { position: absolute; left: 3px; right: 3px; border-radius: 6px; padding: 5px 8px; cursor: grab; z-index: 2; overflow: hidden; font-size: 0.8rem; line-height: 1.3; transition: box-shadow 0.15s; }
+  .block:active { cursor: grabbing; }
+  .block.dragging { cursor: grabbing; }
+  .block:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 3; }
+  .block .block-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .block .block-time { font-size: 0.68rem; opacity: 0.7; margin-top: 1px; }
+  .block .block-category-inline { font-weight: 400; opacity: 0.55; font-size: 0.7rem; margin-left: 4px; }
+  .block-actions { position: absolute; top: 3px; right: 5px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+  .block:hover .block-actions { opacity: 0.6; }
+  .block:hover .block-actions:hover { opacity: 1; }
+  .block-action { cursor: pointer; font-size: 0.75rem; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.1); }
+  .block-action:hover { background: rgba(0,0,0,0.2); }
+  .block.dragging { opacity: 0.5; z-index: 1; }
+
+  .block .resize-handle { position: absolute; bottom: 0; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+  .block .resize-handle-left, .block .resize-handle-right { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; z-index: 4; }
+  .block .resize-handle-left { left: -3px; }
+  .block .resize-handle-right { right: -3px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; justify-content: center; align-items: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #fff; border-radius: 12px; padding: 24px; width: 380px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+  .modal h2 { font-size: 1.05rem; margin-bottom: 16px; color: #1a73e8; }
+  .modal .field { margin-bottom: 14px; }
+  .modal label { display: block; font-size: 0.78rem; color: #5f6368; margin-bottom: 4px; font-weight: 500; }
+  .modal input, .modal select { width: 100%; padding: 8px 12px; background: #f8f9fa; border: 1px solid #dadce0; color: #1a1a1a; border-radius: 8px; font-size: 0.88rem; }
+  .modal input:focus, .modal select:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+  .modal .time-row { display: flex; gap: 10px; }
+  .modal .time-row > div { flex: 1; }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .modal .actions button { padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 500; }
+  .btn-save { background: #1a73e8; color: #fff; }
+  .btn-save:hover { background: #1557b0; }
+  .btn-cancel { background: #f1f3f4; color: #3c4043; }
+  .btn-cancel:hover { background: #e8eaed; }
+  .btn-delete { background: transparent; color: #d93025; border: 1px solid #d93025 !important; }
+  .btn-delete:hover { background: rgba(217,48,37,0.06); }
+
+  /* Category combobox */
+  .category-input-wrap { position: relative; }
+  .category-input-wrap input { width: 100%; }
+  .category-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #dadce0; border-top: none; border-radius: 0 0 8px 8px; max-height: 180px; overflow-y: auto; z-index: 10; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .category-dropdown.open { display: block; }
+  .category-option { padding: 8px 12px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; }
+  .category-option:hover, .category-option.highlighted { background: #f1f3f4; }
+  .category-option .cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .category-option .cat-name { flex: 1; }
+  .category-option .cat-del { opacity: 0; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.75rem; color: #5f6368; flex-shrink: 0; }
+  .category-option:hover .cat-del { opacity: 0.5; }
+  .category-option .cat-del:hover { opacity: 1; background: rgba(217,48,37,0.1); color: #d93025; }
+  .category-hint { padding: 6px 12px; font-size: 0.75rem; color: #9aa0a6; border-top: 1px solid #f1f3f4; }
+  .category-input-wrap .cat-badge { display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; pointer-events: none; }
+  .category-input-wrap .cat-badge.visible { display: inline-block; }
+
+  /* Tab bar */
+  .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 38px; background: #f1f3f4; border-top: 1px solid #dadce0; display: flex; align-items: center; padding: 0 8px; gap: 2px; z-index: 50; overflow-x: auto; }
+  .tab { padding: 6px 14px; font-size: 0.8rem; color: #5f6368; background: transparent; border: none; border-radius: 6px 6px 0 0; cursor: pointer; white-space: nowrap; position: relative; font-weight: 500; }
+  .tab:hover { background: #e8eaed; }
+  .tab.active { background: #fff; color: #1a73e8; box-shadow: 0 -1px 0 #fff; }
+  .tab .tab-close { display: none; margin-left: 6px; font-size: 0.7rem; opacity: 0.5; cursor: pointer; }
+  .tab:hover .tab-close { display: inline; }
+  .tab .tab-close:hover { opacity: 1; }
+  .tab-add { padding: 4px 10px; font-size: 1rem; color: #5f6368; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; line-height: 1; }
+  .tab-add:hover { background: #e8eaed; }
+  .tab-menu { position: absolute; bottom: 100%; left: 0; background: #fff; border: 1px solid #dadce0; border-radius: 8px; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); display: none; z-index: 60; min-width: 140px; overflow: hidden; }
+  .tab-menu.open { display: block; }
+  .tab-menu-item { padding: 8px 14px; font-size: 0.82rem; cursor: pointer; color: #3c4043; }
+  .tab-menu-item:hover { background: #f1f3f4; }
+  .tab-menu-item.danger { color: #d93025; }
+  body { padding-bottom: 42px; }
+
+  /* Help panel */
+  .help-btn { padding: 7px 14px; border: 1px solid #dadce0; background: #fff; color: #3c4043; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 500; }
+  .help-btn:hover { background: #f1f3f4; }
+  .help-panel { display: none; padding: 20px 24px; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; position: relative; }
+  .help-panel.open { display: block; }
+  .help-close { position: absolute; top: 12px; right: 16px; background: #e8eaed; border: none; width: 28px; height: 28px; border-radius: 50%; font-size: 1rem; color: #5f6368; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .help-close:hover { background: #dadce0; color: #1a1a1a; }
+  .help-panel h3 { font-size: 0.9rem; color: #1a73e8; margin-bottom: 10px; }
+  .help-columns { display: flex; gap: 32px; flex-wrap: wrap; }
+  .help-col { flex: 1; min-width: 220px; }
+  .help-col h4 { font-size: 0.78rem; color: #5f6368; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .help-col ul { list-style: none; margin: 0 0 14px 0; padding: 0; }
+  .help-col li { font-size: 0.82rem; color: #3c4043; padding: 3px 0; line-height: 1.4; }
+  .help-col li kbd { display: inline-block; padding: 1px 5px; background: #fff; border: 1px solid #dadce0; border-radius: 4px; font-family: inherit; font-size: 0.75rem; color: #5f6368; }
+  .help-note { font-size: 0.78rem; color: #80868b; margin-top: 8px; padding-top: 10px; border-top: 1px solid #e0e0e0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Ideal Week Planner</h1>
+  <div class="header-actions">
+    <button class="help-btn" id="help-toggle-btn" onclick="toggleHelp()">How to use</button>
+    <button onclick="clearAll()">Clear All</button>
+    <button onclick="exportJSON()">Export</button>
+    <button onclick="importJSON()">Import</button>
+  </div>
+</div>
+
+<div class="help-panel" id="help-panel">
+  <button class="help-close" onclick="toggleHelp()">&times;</button>
+  <div class="help-columns">
+    <div class="help-col">
+      <h4>Creating blocks</h4>
+      <ul>
+        <li>Click on empty space to add a block</li>
+        <li>Drag down on empty space to set the duration as you create</li>
+        <li>Type any category name — it saves for reuse</li>
+      </ul>
+      <h4>Editing</h4>
+      <ul>
+        <li>Click a block to edit its details</li>
+        <li>Drag the bottom edge to change duration</li>
+        <li>Hover and click <strong>&times;</strong> to delete</li>
+        <li><kbd>Cmd</kbd> + <kbd>Z</kbd> to undo (works across tabs)</li>
+      </ul>
+    </div>
+    <div class="help-col">
+      <h4>Moving &amp; duplicating</h4>
+      <ul>
+        <li>Drag a block to move it to a new time or day</li>
+        <li>Hold <kbd>Option</kbd> and drag to duplicate a block</li>
+        <li>Drag the left/right edge of a block to copy it across days</li>
+        <li>Drag the left/right edge of a day header to copy the whole day across the week (replaces target days)</li>
+        <li>Right-click a day header to copy to a specific day, copy to all, or clear that day</li>
+      </ul>
+    </div>
+    <div class="help-col">
+      <h4>Versions &amp; saving</h4>
+      <ul>
+        <li>Use tabs at the bottom to create different versions of your week</li>
+        <li>Double-click a tab to rename it</li>
+        <li>Right-click a tab to duplicate or delete it</li>
+        <li>Your layout saves automatically in this browser</li>
+        <li>Use <strong>Export</strong> to download a backup you can <strong>Import</strong> later</li>
+      </ul>
+      <h4>Breakdown</h4>
+      <ul>
+        <li>Click <strong>View breakdown</strong> in the summary bar to see how your time is split across categories</li>
+      </ul>
+    </div>
+  </div>
+  <div class="help-note">
+    <strong>The goal:</strong> Design your ideal week with no overlapping blocks — every hour has one purpose. This is a desktop exercise, not optimised for mobile. Sit down, take your time, and be intentional about it.
+  </div>
+</div>
+
+<div class="summary" id="summary"></div>
+
+<div class="breakdown-overlay" id="breakdown-overlay" onclick="if(event.target===this)closeBreakdown()">
+  <div class="breakdown-modal">
+    <div class="breakdown-header">
+      <div>
+        <h2>Time Breakdown</h2>
+        <p id="breakdown-subtitle"></p>
+      </div>
+      <button class="breakdown-close" onclick="closeBreakdown()">&times;</button>
+    </div>
+    <div class="breakdown-body">
+      <div class="breakdown-chart-wrap">
+        <div class="breakdown-chart" id="breakdown-chart">
+          <div class="breakdown-chart-hole">
+            <span class="total" id="breakdown-total"></span>
+            <span class="label">hrs / week</span>
+          </div>
+        </div>
+        <div class="breakdown-chart-sub" id="breakdown-chart-sub"></div>
+      </div>
+      <div class="breakdown-list" id="breakdown-rows"></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="day-ctx" id="day-ctx"></div>
+
+<div class="calendar-container" id="calendar"></div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">Add Block</h2>
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="block-title" placeholder="e.g. Deep Work, Coaching, Buffer...">
+    </div>
+    <div class="field">
+      <div class="time-row">
+        <div><label>Start</label><select id="block-start"></select></div>
+        <div><label>End</label><select id="block-end"></select></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <div class="category-input-wrap">
+        <input type="text" id="block-category" placeholder="Type to search or create..." autocomplete="off" style="padding-right: 70px;">
+        <span class="cat-badge" id="cat-badge"></span>
+        <div class="category-dropdown" id="category-dropdown"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn-delete" id="btn-delete" onclick="deleteBlock()" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveBlock()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="tab-bar" id="tab-bar"></div>
+<div class="tab-menu" id="tab-menu">
+  <div class="tab-menu-item" onclick="renameTab()">Rename</div>
+  <div class="tab-menu-item" onclick="duplicateTab()">Duplicate</div>
+  <div class="tab-menu-item danger" onclick="deleteTab()">Delete</div>
+</div>
+
+<input type="file" id="file-input" accept=".json" style="display:none">
+
+<script>
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const START_HOUR = 5;
+const END_HOUR = 22;
+const SLOT_HEIGHT = 48;
+
+// Rotating palette for auto-assigning colors to new categories
+const COLOR_PALETTE = [
+  { color: '#1a73e8', bg: '#d2e3fc', text: '#174ea6' },
+  { color: '#0d904f', bg: '#ceead6', text: '#0d652d' },
+  { color: '#e8710a', bg: '#fde293', text: '#8a5100' },
+  { color: '#9334e6', bg: '#e8d0f5', text: '#6a1fa0' },
+  { color: '#12826c', bg: '#a8dab5', text: '#0e6354' },
+  { color: '#7b61ff', bg: '#e0d7ff', text: '#5a3fd6' },
+  { color: '#d93025', bg: '#fad2cf', text: '#a50e0e' },
+  { color: '#80868b', bg: '#e8eaed', text: '#5f6368' },
+  { color: '#185abc', bg: '#c5d9f9', text: '#0d3280' },
+  { color: '#b5651d', bg: '#f5deb3', text: '#7a3e10' },
+  { color: '#c2185b', bg: '#f8bbd0', text: '#880e4f' },
+  { color: '#00838f', bg: '#b2ebf2', text: '#005662' },
+];
+
+// Categories stored as { name -> { color, bg, text } }
+let categories = JSON.parse(localStorage.getItem('idealWeekCategories') || '{}');
+
+// --- Tabs ---
+let tabs = JSON.parse(localStorage.getItem('idealWeekTabs') || 'null');
+let activeTabIdx = parseInt(localStorage.getItem('idealWeekActiveTab') || '0');
+
+// Migrate legacy single-list format
+if (!tabs) {
+  const legacyBlocks = JSON.parse(localStorage.getItem('idealWeekBlocks') || '[]');
+  tabs = [{ name: 'Version 1', blocks: legacyBlocks }];
+}
+if (activeTabIdx >= tabs.length) activeTabIdx = 0;
+
+let blocks = tabs[activeTabIdx].blocks;
+let editingBlock = null;
+let editingBlockIdx = -1;
+let editingDay = 0;
+let highlightedIdx = -1;
+let contextTabIdx = -1;
+let contextDayIdx = -1;
+
+// Drag states
+let dragCreate = { active: false, day: -1, startHour: 0, preview: null, slotsEl: null };
+let dragMove = { active: false, block: null, offsetH: 0, blockEl: null, moved: false };
+let dragDay = { active: false, sourceDay: -1, spawnedDays: new Set(), didDrag: false };
+
+// Undo history — stores full state snapshots (all tabs + active tab index)
+let undoStack = [];
+const MAX_UNDO = 50;
+
+function pushUndo() {
+  tabs[activeTabIdx].blocks = blocks;
+  undoStack.push(JSON.stringify({ tabs, activeTabIdx }));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  closeModal();
+  const snapshot = JSON.parse(undoStack.pop());
+  tabs = snapshot.tabs;
+  const prevTab = snapshot.activeTabIdx;
+  if (prevTab !== activeTabIdx) {
+    activeTabIdx = prevTab;
+  }
+  blocks = tabs[activeTabIdx].blocks;
+  save();
+  buildCalendar();
+  renderTabs();
+}
+
+function save() {
+  tabs[activeTabIdx].blocks = blocks;
+  localStorage.setItem('idealWeekTabs', JSON.stringify(tabs));
+  localStorage.setItem('idealWeekActiveTab', activeTabIdx);
+  localStorage.setItem('idealWeekCategories', JSON.stringify(categories));
+}
+
+function getCategoryStyle(name) {
+  if (!name) return COLOR_PALETTE[0];
+  if (categories[name]) return categories[name];
+  // Assign next color from palette
+  const idx = Object.keys(categories).length % COLOR_PALETTE.length;
+  categories[name] = { ...COLOR_PALETTE[idx] };
+  save();
+  return categories[name];
+}
+
+function timeStr(h) {
+  const hour = Math.floor(h);
+  const min = (h % 1) * 60;
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${min === 0 ? '00' : '30'} ${ampm}`;
+}
+
+function snapToHalf(h) { return Math.round(h * 2) / 2; }
+function clampHour(h) { return Math.max(START_HOUR, Math.min(END_HOUR, h)); }
+
+function yToHour(y, slotsEl) {
+  const rect = slotsEl.getBoundingClientRect();
+  return snapToHalf(START_HOUR + (y - rect.top) / SLOT_HEIGHT);
+}
+
+function buildCalendar() {
+  const cal = document.getElementById('calendar');
+  cal.innerHTML = '';
+
+  const timeCol = document.createElement('div');
+  timeCol.className = 'time-column';
+  timeCol.innerHTML = '<div class="day-header"></div>';
+  for (let h = START_HOUR; h < END_HOUR; h++) {
+    const label = document.createElement('div');
+    label.className = 'time-label';
+    label.textContent = timeStr(h);
+    timeCol.appendChild(label);
+  }
+  cal.appendChild(timeCol);
+
+  DAYS.forEach((day, di) => {
+    const col = document.createElement('div');
+    col.className = 'day-column';
+    col.dataset.day = di;
+
+    const header = document.createElement('div');
+    header.className = 'day-header' + (di >= 5 ? ' weekend' : '');
+    header.textContent = day;
+
+    ['left', 'right'].forEach(side => {
+      const hint = document.createElement('div');
+      hint.className = `drag-hint drag-hint-${side}`;
+      header.appendChild(hint);
+      hint.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        startDayDrag(di, e.clientX);
+        const onMove = (e2) => updateDayDrag(e2);
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          finishDayDrag();
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+
+    header.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showDayCtx(di, e.clientX, e.clientY);
+    });
+    col.appendChild(header);
+
+    const slots = document.createElement('div');
+    slots.className = 'day-slots';
+    slots.dataset.day = di;
+
+    for (let h = START_HOUR; h < END_HOUR; h++) {
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      slots.appendChild(slot);
+    }
+
+    slots.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.block')) return;
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const hour = yToHour(e.clientY, slots);
+      const preview = document.createElement('div');
+      preview.className = 'drag-preview';
+      slots.appendChild(preview);
+      dragCreate = { active: true, day: di, startHour: clampHour(hour), startY: e.clientY, preview, slotsEl: slots };
+      updateDragPreview(e.clientY);
+    });
+
+    col.appendChild(slots);
+    cal.appendChild(col);
+  });
+
+  renderBlocks();
+  renderSummary();
+}
+
+function updateDragPreview(clientY) {
+  if (!dragCreate.active) return;
+  const { startHour, preview, slotsEl } = dragCreate;
+  const currentHour = clampHour(yToHour(clientY, slotsEl));
+  const top = (Math.min(startHour, currentHour) - START_HOUR) * SLOT_HEIGHT;
+  const height = Math.abs(currentHour - startHour) * SLOT_HEIGHT;
+  preview.style.top = top + 'px';
+  preview.style.height = Math.max(height, SLOT_HEIGHT / 2) + 'px';
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (dragCreate.active) updateDragPreview(e.clientY);
+  if (dragMove.active) updateDragMove(e);
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (dragCreate.active) finishDragCreate(e.clientY);
+  if (dragMove.active) finishDragMove(e);
+});
+
+function finishDragCreate(clientY) {
+  const { day, startHour, startY, preview, slotsEl } = dragCreate;
+  preview.remove();
+  const endHour = clampHour(yToHour(clientY, slotsEl));
+  const s = Math.min(startHour, endHour);
+  const en = Math.max(startHour, endHour);
+  const pixelsMoved = Math.abs(clientY - startY);
+  dragCreate.active = false;
+  if (pixelsMoved < 10) {
+    // Pure click — open modal with 1hr default
+    openModal(day, snapToHalf(s));
+  } else {
+    // Dragged — use the actual range, minimum 30min
+    const finalEnd = en <= s ? s + 0.5 : en;
+    openModal(day, s, null, finalEnd);
+  }
+}
+
+function startDragMove(e, block, blockEl) {
+  if (e.target.closest('.resize-handle') || e.target.closest('.block-delete')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const col = blockEl.closest('.day-column');
+  const slotsEl = col.querySelector('.day-slots');
+  const clickHour = yToHour(e.clientY, slotsEl);
+  const isDup = e.altKey;
+  blockEl.classList.add('dragging');
+  pushUndo();
+
+  let dragBlock = block;
+  if (isDup) {
+    dragBlock = { day: block.day, title: block.title, start: block.start, end: block.end, category: block.category };
+    blocks.push(dragBlock);
+    save();
+  }
+
+  dragMove = { active: true, block: dragBlock, origBlock: isDup ? block : null, offsetH: clickHour - block.start, blockEl, moved: false, isDup };
+}
+
+function updateDragMove(e) {
+  if (!dragMove.active) return;
+  dragMove.moved = true;
+  const { block, offsetH } = dragMove;
+  const cols = document.querySelectorAll('.day-slots');
+  let targetDay = block.day;
+  cols.forEach((col, i) => {
+    const rect = col.getBoundingClientRect();
+    if (e.clientX >= rect.left && e.clientX <= rect.right) targetDay = i;
+  });
+  const targetSlots = cols[targetDay];
+  if (!targetSlots) return;
+  const duration = block.end - block.start;
+  const newStart = clampHour(snapToHalf(yToHour(e.clientY, targetSlots) - offsetH));
+  const newEnd = Math.min(END_HOUR, newStart + duration);
+  block.day = targetDay;
+  block.start = newEnd - duration;
+  block.end = newEnd;
+  save();
+  renderBlocks();
+  const allBlocks = document.querySelectorAll('.block');
+  allBlocks.forEach(el => {
+    if (el.dataset.blockIdx == blocks.indexOf(block)) {
+      el.classList.add('dragging');
+      dragMove.blockEl = el;
+    }
+  });
+}
+
+function finishDragMove(e) {
+  const wasMoved = dragMove.moved;
+  const block = dragMove.block;
+  const isDup = dragMove.isDup;
+  if (dragMove.blockEl) dragMove.blockEl.classList.remove('dragging');
+
+  // If didn't actually move, pop the undo entry and clean up
+  if (!wasMoved) {
+    undoStack.pop();
+    if (isDup) {
+      const idx = blocks.indexOf(block);
+      if (idx >= 0) blocks.splice(idx, 1);
+      save();
+    }
+  }
+
+  dragMove.active = false;
+  dragMove.moved = false;
+  renderBlocks();
+  renderSummary();
+  if (!wasMoved && !isDup && block) {
+    openModal(block.day, block.start, block);
+  }
+}
+
+function startDayDrag(sourceDay, startX) {
+  const sourceBlocks = blocks.filter(b => b.day === sourceDay);
+  if (sourceBlocks.length === 0) return;
+  // Save original blocks for each day so we can restore when retracting
+  const savedDays = {};
+  DAYS.forEach((_, i) => { if (i !== sourceDay) savedDays[i] = blocks.filter(b => b.day === i); });
+  dragDay = { active: true, sourceDay, sourceBlocks, savedDays, replacedDays: new Set(), didDrag: false };
+  pushUndo();
+}
+
+function updateDayDrag(e) {
+  if (!dragDay.active) return;
+  const { sourceDay, sourceBlocks, savedDays, replacedDays } = dragDay;
+
+  const cols = document.querySelectorAll('.day-column');
+  let hoverDay = sourceDay;
+  cols.forEach((col, i) => {
+    const rect = col.getBoundingClientRect();
+    if (e.clientX >= rect.left && e.clientX <= rect.right) hoverDay = i;
+  });
+
+  if (hoverDay === sourceDay && replacedDays.size === 0) return;
+  dragDay.didDrag = true;
+
+  const minDay = Math.min(sourceDay, hoverDay);
+  const maxDay = Math.max(sourceDay, hoverDay);
+  const targetDays = new Set();
+  for (let d = minDay; d <= maxDay; d++) {
+    if (d !== sourceDay) targetDays.add(d);
+  }
+
+  // Replace target days with source blocks
+  for (const d of targetDays) {
+    if (!replacedDays.has(d)) {
+      blocks = blocks.filter(b => b.day !== d);
+      for (const sb of sourceBlocks) {
+        blocks.push({ day: d, title: sb.title, start: sb.start, end: sb.end, category: sb.category });
+      }
+      replacedDays.add(d);
+    }
+  }
+
+  // Restore original blocks for days no longer in range
+  for (const d of [...replacedDays]) {
+    if (!targetDays.has(d)) {
+      blocks = blocks.filter(b => b.day !== d);
+      for (const ob of savedDays[d]) {
+        blocks.push({ ...ob });
+      }
+      replacedDays.delete(d);
+    }
+  }
+
+  document.querySelectorAll('.day-header').forEach(h => {
+    const col = h.closest('.day-column');
+    if (!col) return;
+    const di = parseInt(col.dataset.day);
+    h.classList.toggle('selected', targetDays.has(di) || di === sourceDay);
+  });
+
+  save();
+  renderBlocks();
+}
+
+function finishDayDrag() {
+  if (!dragDay.active) return;
+  dragDay.active = false;
+  document.querySelectorAll('.day-header').forEach(h => h.classList.remove('selected'));
+  renderBlocks();
+  renderSummary();
+}
+
+function showDayCtx(di, x, y) {
+  contextDayIdx = di;
+  const menu = document.getElementById('day-ctx');
+  const sourceBlocks = blocks.filter(b => b.day === di);
+  const sourceName = DAYS[di];
+  const hasBlocks = sourceBlocks.length > 0;
+
+  let subItems = '';
+  DAYS.forEach((day, i) => {
+    if (i === di) return;
+    const existing = blocks.filter(b => b.day === i).length;
+    const label = existing > 0 ? `${day} <span style="color:#9aa0a6;font-size:0.75rem">(${existing})</span>` : day;
+    subItems += `<div class="day-ctx-item" onclick="duplicateDayTo(${i})">${label}</div>`;
+  });
+
+  menu.innerHTML = `
+    ${hasBlocks ? `
+      <div class="day-ctx-item" onclick="duplicateDayToAll()">Copy to all days<span class="arrow"></span></div>
+      <div class="day-ctx-item">Copy to...<span class="arrow">&#9656;</span>
+        <div class="day-ctx-sub">${subItems}</div>
+      </div>
+      <div class="day-ctx-item danger" onclick="clearDay()">Clear ${sourceName}</div>
+    ` : `
+      <div class="day-ctx-item" style="color:#9aa0a6;cursor:default">${sourceName} is empty</div>
+    `}
+  `;
+
+  // Position — keep on screen
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.classList.add('open');
+
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + 'px';
+    if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + 'px';
+  });
+}
+
+function closeDayCtx() {
+  document.getElementById('day-ctx').classList.remove('open');
+}
+
+function duplicateDayTo(targetDay) {
+  closeDayCtx();
+  const sourceBlocks = blocks.filter(b => b.day === contextDayIdx);
+  if (sourceBlocks.length === 0) return;
+  pushUndo();
+  blocks = blocks.filter(b => b.day !== targetDay);
+  for (const sb of sourceBlocks) {
+    blocks.push({ day: targetDay, title: sb.title, start: sb.start, end: sb.end, category: sb.category });
+  }
+  tabs[activeTabIdx].blocks = blocks;
+  save();
+  renderBlocks();
+  renderSummary();
+}
+
+function duplicateDayToAll() {
+  closeDayCtx();
+  const sourceBlocks = blocks.filter(b => b.day === contextDayIdx);
+  if (sourceBlocks.length === 0) return;
+  pushUndo();
+  for (let d = 0; d < 7; d++) {
+    if (d === contextDayIdx) continue;
+    blocks = blocks.filter(b => b.day !== d);
+    for (const sb of sourceBlocks) {
+      blocks.push({ day: d, title: sb.title, start: sb.start, end: sb.end, category: sb.category });
+    }
+  }
+  tabs[activeTabIdx].blocks = blocks;
+  save();
+  renderBlocks();
+  renderSummary();
+}
+
+function clearDay() {
+  closeDayCtx();
+  pushUndo();
+  blocks = blocks.filter(b => b.day !== contextDayIdx);
+  tabs[activeTabIdx].blocks = blocks;
+  save();
+  renderBlocks();
+  renderSummary();
+}
+
+
+function renderBlocks() {
+  document.querySelectorAll('.block').forEach(el => el.remove());
+
+  blocks.forEach((block, idx) => {
+    const cols = document.querySelectorAll('.day-column');
+    const col = cols[block.day];
+    if (!col) return;
+    const slots = col.querySelector('.day-slots');
+
+    const cat = getCategoryStyle(block.category);
+    const top = (block.start - START_HOUR) * SLOT_HEIGHT;
+    const height = (block.end - block.start) * SLOT_HEIGHT;
+
+    const el = document.createElement('div');
+    el.className = 'block';
+    el.dataset.blockIdx = idx;
+    el.style.top = top + 'px';
+    el.style.height = height + 'px';
+    el.style.background = cat.bg;
+    el.style.borderLeft = `3px solid ${cat.color}`;
+    el.style.color = cat.text;
+
+    const catLabel = block.category ? ` <span class="block-category-inline">${block.category}</span>` : '';
+    el.innerHTML = `
+      <div class="block-title">${block.title}${height <= 30 ? catLabel : ''}</div>
+      ${height > 30 ? `<div class="block-time">${timeStr(block.start)} - ${timeStr(block.end)}${catLabel}</div>` : ''}
+      <div class="block-actions"><span class="block-action block-delete" title="Delete">&times;</span></div>
+      <div class="resize-handle"></div>
+      <div class="resize-handle-left"></div>
+      <div class="resize-handle-right"></div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('block-delete')) {
+        e.stopPropagation();
+        pushUndo();
+        blocks.splice(idx, 1);
+        save();
+        renderBlocks();
+        renderSummary();
+        return;
+      }
+    });
+
+    el.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left') || e.target.closest('.resize-handle-right') || e.target.closest('.block-actions')) return;
+      startDragMove(e, block, el);
+    });
+
+    // Vertical resize (duration)
+    el.querySelector('.resize-handle').addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      pushUndo();
+      const startY = e.clientY;
+      const startEnd = block.end;
+      const onMove = (e2) => {
+        const dy = e2.clientY - startY;
+        const dh = Math.round(dy / (SLOT_HEIGHT / 2)) * 0.5;
+        block.end = Math.max(block.start + 0.5, Math.min(END_HOUR, startEnd + dh));
+        save();
+        renderBlocks();
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        renderSummary();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Horizontal resize (add this block to other days)
+    ['left', 'right'].forEach(dir => {
+      el.querySelector(`.resize-handle-${dir}`).addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        pushUndo();
+        const origDay = block.day;
+        let spawnedDays = new Set();
+
+        const onMove = (e2) => {
+          const cols = document.querySelectorAll('.day-slots');
+          let hoverDay = origDay;
+          cols.forEach((col, i) => {
+            const rect = col.getBoundingClientRect();
+            if (e2.clientX >= rect.left && e2.clientX <= rect.right) hoverDay = i;
+          });
+
+          const minDay = Math.min(origDay, hoverDay);
+          const maxDay = Math.max(origDay, hoverDay);
+          const targetDays = new Set();
+          for (let d = minDay; d <= maxDay; d++) {
+            if (d !== origDay) targetDays.add(d);
+          }
+
+          // Add copy to new days
+          for (const d of targetDays) {
+            if (!spawnedDays.has(d)) {
+              blocks.push({ day: d, title: block.title, start: block.start, end: block.end, category: block.category });
+              spawnedDays.add(d);
+            }
+          }
+
+          // Remove copies from days no longer in range
+          for (const d of [...spawnedDays]) {
+            if (!targetDays.has(d)) {
+              const i = blocks.findIndex(b => b !== block && b.day === d && b.title === block.title && b.start === block.start && b.end === block.end && b.category === block.category);
+              if (i >= 0) blocks.splice(i, 1);
+              spawnedDays.delete(d);
+            }
+          }
+
+          save();
+          renderBlocks();
+        };
+
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          renderSummary();
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+
+    slots.appendChild(el);
+  });
+}
+
+// --- Category combobox ---
+const catInput = document.getElementById('block-category');
+const catDropdown = document.getElementById('category-dropdown');
+
+function getKnownCategories() {
+  // Merge categories from saved map + any on blocks
+  const names = new Set(Object.keys(categories));
+  blocks.forEach(b => { if (b.category) names.add(b.category); });
+  return [...names].sort();
+}
+
+function renderCategoryDropdown(filter = '') {
+  const all = getKnownCategories();
+  const lower = filter.toLowerCase();
+  const matches = filter ? all.filter(n => n.toLowerCase().includes(lower)) : all;
+  const exactMatch = all.some(n => n.toLowerCase() === lower);
+
+  catDropdown.innerHTML = '';
+  highlightedIdx = -1;
+
+  matches.forEach((name, i) => {
+    const style = getCategoryStyle(name);
+    const opt = document.createElement('div');
+    opt.className = 'category-option';
+    opt.dataset.idx = i;
+    opt.innerHTML = `<span class="cat-dot" style="background:${style.color}"></span><span class="cat-name">${name}</span><span class="cat-del" title="Delete category">&times;</span>`;
+    opt.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('cat-del')) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteCategory(name);
+        return;
+      }
+      e.preventDefault();
+      catInput.value = name;
+      acceptCategory();
+    });
+    catDropdown.appendChild(opt);
+  });
+
+  if (filter && !exactMatch) {
+    const hint = document.createElement('div');
+    hint.className = 'category-hint';
+    hint.textContent = `Press Enter to create "${filter}"`;
+    catDropdown.appendChild(hint);
+  }
+
+  catDropdown.classList.toggle('open', matches.length > 0 || (filter && !exactMatch));
+}
+
+const catBadge = document.getElementById('cat-badge');
+
+function showCatBadge(name) {
+  if (!name) { catBadge.classList.remove('visible'); return; }
+  const style = getCategoryStyle(name);
+  catBadge.style.background = style.bg;
+  catBadge.style.color = style.text;
+  catBadge.textContent = name;
+  catBadge.classList.add('visible');
+}
+
+function closeCategoryDropdown() {
+  catDropdown.classList.remove('open');
+  highlightedIdx = -1;
+}
+
+function deleteCategory(name) {
+  pushUndo();
+  delete categories[name];
+  blocks.forEach(b => { if (b.category === name) b.category = ''; });
+  save();
+  renderBlocks();
+  renderSummary();
+  renderCategoryDropdown(catInput.value);
+  if (catInput.value === name) {
+    catInput.value = '';
+    catBadge.classList.remove('visible');
+  }
+}
+
+function acceptCategory() {
+  closeCategoryDropdown();
+  const val = catInput.value.trim();
+  if (val) showCatBadge(val);
+}
+
+catInput.addEventListener('focus', () => { catBadge.classList.remove('visible'); renderCategoryDropdown(catInput.value); });
+catInput.addEventListener('input', () => { catBadge.classList.remove('visible'); renderCategoryDropdown(catInput.value); });
+catInput.addEventListener('blur', () => { setTimeout(() => { closeCategoryDropdown(); acceptCategory(); }, 150); });
+catInput.addEventListener('keydown', (e) => {
+  const options = catDropdown.querySelectorAll('.category-option');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    highlightedIdx = Math.min(highlightedIdx + 1, options.length - 1);
+    options.forEach((o, i) => o.classList.toggle('highlighted', i === highlightedIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    highlightedIdx = Math.max(highlightedIdx - 1, 0);
+    options.forEach((o, i) => o.classList.toggle('highlighted', i === highlightedIdx));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (highlightedIdx >= 0 && options[highlightedIdx]) {
+      const all = getKnownCategories();
+      const lower = catInput.value.toLowerCase();
+      const matches = catInput.value ? all.filter(n => n.toLowerCase().includes(lower)) : all;
+      if (matches[highlightedIdx]) catInput.value = matches[highlightedIdx];
+    }
+    acceptCategory();
+  } else if (e.key === 'Tab') {
+    acceptCategory();
+  }
+});
+
+// --- Time selects ---
+function populateTimeSelects() {
+  const startSel = document.getElementById('block-start');
+  const endSel = document.getElementById('block-end');
+  startSel.innerHTML = '';
+  endSel.innerHTML = '';
+  for (let h = START_HOUR; h <= END_HOUR; h += 0.5) {
+    if (h < END_HOUR) {
+      const opt = document.createElement('option');
+      opt.value = h;
+      opt.textContent = timeStr(h);
+      startSel.appendChild(opt);
+    }
+    if (h > START_HOUR) {
+      const opt = document.createElement('option');
+      opt.value = h;
+      opt.textContent = timeStr(h);
+      endSel.appendChild(opt);
+    }
+  }
+}
+
+function openModal(day, hour, block = null, endHour = null) {
+  editingBlock = block;
+  editingBlockIdx = block ? blocks.indexOf(block) : -1;
+  editingDay = day;
+
+  document.getElementById('modal-title').textContent = block ? 'Edit Block' : 'New Block';
+  document.getElementById('btn-delete').style.display = block ? 'inline-block' : 'none';
+
+  populateTimeSelects();
+
+  document.getElementById('block-title').value = block ? block.title : '';
+  document.getElementById('block-start').value = block ? block.start : hour;
+  document.getElementById('block-end').value = block ? block.end : (endHour || hour + 1);
+  catInput.value = block ? (block.category || '') : '';
+  if (block && block.category) { showCatBadge(block.category); } else { catBadge.classList.remove('visible'); }
+
+  document.getElementById('modal').classList.add('active');
+  setTimeout(() => document.getElementById('block-title').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  closeCategoryDropdown();
+  editingBlock = null;
+  editingBlockIdx = -1;
+}
+
+function saveBlock() {
+  const title = document.getElementById('block-title').value.trim() || 'Untitled';
+  const start = parseFloat(document.getElementById('block-start').value);
+  const end = parseFloat(document.getElementById('block-end').value);
+  const category = catInput.value.trim();
+
+  if (end <= start) { alert('End time must be after start time'); return; }
+
+  pushUndo();
+  if (category) getCategoryStyle(category);
+
+  if (editingBlockIdx >= 0 && blocks[editingBlockIdx]) {
+    blocks[editingBlockIdx].title = title;
+    blocks[editingBlockIdx].start = start;
+    blocks[editingBlockIdx].end = end;
+    blocks[editingBlockIdx].category = category;
+  } else if (editingBlock && blocks.includes(editingBlock)) {
+    editingBlock.title = title;
+    editingBlock.start = start;
+    editingBlock.end = end;
+    editingBlock.category = category;
+  } else {
+    blocks.push({ day: editingDay, title, start, end, category });
+  }
+
+  save();
+  closeModal();
+  renderBlocks();
+  renderSummary();
+}
+
+function deleteBlock() {
+  const idx = editingBlockIdx >= 0 ? editingBlockIdx : blocks.indexOf(editingBlock);
+  if (idx >= 0) {
+    pushUndo();
+    blocks.splice(idx, 1);
+    save();
+    closeModal();
+    renderBlocks();
+    renderSummary();
+  }
+}
+
+function renderSummary() {
+  const totals = {};
+  blocks.forEach(b => {
+    const name = b.category || 'Uncategorized';
+    totals[name] = (totals[name] || 0) + (b.end - b.start);
+  });
+
+  const el = document.getElementById('summary');
+  const totalHrs = Object.values(totals).reduce((a, b) => a + b, 0);
+
+  let html = `<div class="summary-item">Total: <span>${totalHrs}h</span></div>`;
+  for (const [name, hrs] of Object.entries(totals).sort((a, b) => b[1] - a[1])) {
+    const style = getCategoryStyle(name);
+    html += `<div class="summary-item"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${style.color};margin-right:4px"></span>${name}: <span>${hrs}h</span></div>`;
+  }
+  if (totalHrs > 0) {
+    html += `<button class="summary-btn" onclick="openBreakdown()">View breakdown</button>`;
+  }
+  el.innerHTML = html;
+}
+
+function openBreakdown() {
+  const totals = {};
+  blocks.forEach(b => {
+    const name = b.category || 'Uncategorized';
+    totals[name] = (totals[name] || 0) + (b.end - b.start);
+  });
+  const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const totalHrs = Object.values(totals).reduce((a, b) => a + b, 0);
+  const numCategories = sorted.length;
+  const avgPerDay = (totalHrs / 7).toFixed(1);
+
+  // Donut chart with small gaps between segments
+  let gradStops = [];
+  let cumPct = 0;
+  const gap = numCategories > 1 ? 0.5 : 0;
+  for (const [name, hrs] of sorted) {
+    const style = getCategoryStyle(name);
+    const pct = (hrs / totalHrs) * 100 - gap;
+    gradStops.push(`transparent ${cumPct}% ${cumPct + gap / 2}%`);
+    gradStops.push(`${style.color} ${cumPct + gap / 2}% ${cumPct + gap / 2 + pct}%`);
+    cumPct += pct + gap;
+  }
+  document.getElementById('breakdown-chart').style.background = `conic-gradient(${gradStops.join(', ')})`;
+  document.getElementById('breakdown-total').textContent = totalHrs;
+  document.getElementById('breakdown-subtitle').textContent = `${numCategories} categories across ${blocks.length} blocks`;
+  document.getElementById('breakdown-chart-sub').textContent = `${avgPerDay}h avg per day`;
+
+  // Rows
+  let rows = '';
+  const maxHrs = sorted.length > 0 ? sorted[0][1] : 1;
+  for (const [name, hrs] of sorted) {
+    const style = getCategoryStyle(name);
+    const pct = Math.round((hrs / totalHrs) * 100);
+    const barW = Math.round((hrs / maxHrs) * 100);
+    const perDay = (hrs / 7).toFixed(1);
+    rows += `<div class="breakdown-row">
+      <span class="dot" style="background:${style.color}"></span>
+      <div class="info">
+        <div class="name">${name}</div>
+        <div class="detail">${hrs}h total &middot; ${perDay}h/day</div>
+        <div class="bar-wrap"><div class="bar" style="width:${barW}%;background:${style.color}"></div></div>
+      </div>
+      <span class="pct-big">${pct}%</span>
+    </div>`;
+  }
+  document.getElementById('breakdown-rows').innerHTML = rows;
+
+  document.getElementById('breakdown-overlay').classList.add('active');
+}
+
+function closeBreakdown() {
+  document.getElementById('breakdown-overlay').classList.remove('active');
+}
+
+function clearAll() {
+  if (confirm('Clear all blocks?')) {
+    pushUndo();
+    blocks = [];
+    save();
+    renderBlocks();
+    renderSummary();
+  }
+}
+
+function exportJSON() {
+  tabs[activeTabIdx].blocks = blocks;
+  const data = JSON.stringify({ tabs, categories, activeTab: activeTabIdx }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ideal-week.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON() { document.getElementById('file-input').click(); }
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (Array.isArray(data)) {
+        // Legacy: plain blocks array
+        tabs = [{ name: 'Imported', blocks: data }];
+      } else if (data.tabs) {
+        // Full tabs format
+        tabs = data.tabs;
+        if (data.categories) Object.assign(categories, data.categories);
+      } else if (data.blocks) {
+        // Single-tab format
+        tabs = [{ name: 'Imported', blocks: data.blocks }];
+        if (data.categories) Object.assign(categories, data.categories);
+      }
+      activeTabIdx = 0;
+      blocks = tabs[0].blocks;
+      undoStack = [];
+      save();
+      buildCalendar();
+      renderTabs();
+    } catch { alert('Invalid JSON file'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// --- Tabs ---
+function renderTabs() {
+  const bar = document.getElementById('tab-bar');
+  bar.innerHTML = '';
+  tabs.forEach((tab, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (i === activeTabIdx ? ' active' : '');
+    btn.innerHTML = `${tab.name}<span class="tab-close">&times;</span>`;
+    btn.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab-close')) {
+        e.stopPropagation();
+        contextTabIdx = i;
+        deleteTab();
+        return;
+      }
+      switchTab(i);
+    });
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      contextTabIdx = i;
+      showTabMenu(e.clientX, e.clientY);
+    });
+    btn.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      contextTabIdx = i;
+      renameTab();
+    });
+    bar.appendChild(btn);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'tab-add';
+  addBtn.textContent = '+';
+  addBtn.title = 'New version';
+  addBtn.addEventListener('click', addTab);
+  bar.appendChild(addBtn);
+}
+
+function switchTab(i) {
+  closeTabMenu();
+  pushUndo();
+  tabs[activeTabIdx].blocks = blocks;
+  activeTabIdx = i;
+  blocks = tabs[i].blocks;
+  save();
+  buildCalendar();
+  renderTabs();
+}
+
+function addTab() {
+  closeTabMenu();
+  const name = `Version ${tabs.length + 1}`;
+  tabs.push({ name, blocks: [] });
+  save();
+  switchTab(tabs.length - 1);
+}
+
+function duplicateTab() {
+  closeTabMenu();
+  const src = tabs[contextTabIdx];
+  const name = src.name + ' (copy)';
+  tabs.push({ name, blocks: JSON.parse(JSON.stringify(src.blocks)) });
+  save();
+  switchTab(tabs.length - 1);
+}
+
+function renameTab() {
+  closeTabMenu();
+  const tabBtns = document.querySelectorAll('#tab-bar .tab');
+  const btn = tabBtns[contextTabIdx];
+  if (!btn) return;
+
+  const current = tabs[contextTabIdx].name;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = current;
+  input.style.cssText = 'width: 100px; font-size: 0.8rem; padding: 2px 6px; border: 1px solid #1a73e8; border-radius: 4px; outline: none; font-family: inherit; background: #fff;';
+
+  btn.textContent = '';
+  btn.appendChild(input);
+  input.focus();
+  input.select();
+
+  const finish = () => {
+    const name = input.value.trim() || current;
+    tabs[contextTabIdx].name = name;
+    save();
+    renderTabs();
+  };
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = current; input.blur(); }
+  });
+}
+
+function deleteTab() {
+  closeTabMenu();
+  if (tabs.length <= 1) { alert('Need at least one tab'); return; }
+  if (!confirm(`Delete "${tabs[contextTabIdx].name}"?`)) return;
+  pushUndo();
+  tabs.splice(contextTabIdx, 1);
+  if (activeTabIdx >= tabs.length) activeTabIdx = tabs.length - 1;
+  if (activeTabIdx === contextTabIdx || activeTabIdx > contextTabIdx) {
+    activeTabIdx = Math.max(0, activeTabIdx - (activeTabIdx > contextTabIdx ? 1 : 0));
+  }
+  blocks = tabs[activeTabIdx].blocks;
+  save();
+  buildCalendar();
+  renderTabs();
+}
+
+function showTabMenu(x, y) {
+  const menu = document.getElementById('tab-menu');
+  menu.style.left = x + 'px';
+  menu.style.bottom = '42px';
+  menu.style.position = 'fixed';
+  menu.classList.add('open');
+}
+
+function closeTabMenu() {
+  document.getElementById('tab-menu').classList.remove('open');
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.tab-menu') && !e.target.closest('.tab')) closeTabMenu();
+  if (!e.target.closest('.day-ctx')) closeDayCtx();
+});
+
+function toggleHelp() {
+  const panel = document.getElementById('help-panel');
+  panel.classList.toggle('open');
+  document.getElementById('help-toggle-btn').textContent = panel.classList.contains('open') ? 'Close help' : 'How to use';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeModal(); closeBreakdown(); }
+  if (e.key === 'Enter' && document.getElementById('modal').classList.contains('active') && document.activeElement !== catInput) saveBlock();
+  if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+  }
+});
+
+buildCalendar();
+renderTabs();
+</script>
+</body>
+</html>
